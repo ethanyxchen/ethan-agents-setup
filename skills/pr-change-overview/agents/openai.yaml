@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Change Overview"
+  short_description: "Summarize PR changes with an ASCII structure map"
+  default_prompt: "Use $pr-change-overview to summarize this PR and include an ASCII diagram of the structural changes."

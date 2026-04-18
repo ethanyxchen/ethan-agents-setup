@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ideas to RFC"
+  short_description: "Convert notes and chats into RFCs"
+  default_prompt: "Use $ideas-to-rfc to turn these notes or agent conversations into an RFC draft."
+policy:
+  allow_implicit_invocation: true
