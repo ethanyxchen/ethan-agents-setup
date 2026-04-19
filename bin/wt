@@ -1,0 +1,391 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'wt: %s\n' "$1" >&2
+  exit 1
+}
+
+usage() {
+  printf '%s\n' \
+    'Usage: wt <command> [options]' \
+    '' \
+    'Manage git worktrees from the current repository.' \
+    '' \
+    'Commands:' \
+    '  add       Create a new worktree in a sibling directory' \
+    '  remove    Remove a registered worktree by branch or path' \
+    '  list      List registered worktrees' \
+    '  prune     Remove stale worktree metadata' \
+    '  help      Show help for wt or a subcommand' \
+    '' \
+    'Aliases:' \
+    '  rm        Alias for remove' \
+    '  ls        Alias for list' \
+    '' \
+    'Examples:' \
+    '  wt add feature/editor-toolbar' \
+    '  wt remove feature/editor-toolbar --delete-branch' \
+    '  wt list' \
+    '  wt prune' \
+    '  wt help remove' \
+    '' \
+    'Run `wt <command> --help` or `wt help <command>` for command-specific usage.'
+}
+
+usage_add() {
+  printf '%s\n' \
+    'Usage: wt add [options] <branch>' \
+    '' \
+    'Create a new git worktree for the current repository.' \
+    '' \
+    'Defaults:' \
+    '  Base branch: remote HEAD branch for the selected remote.' \
+    '  Path: sibling directory at ../<repo>-<branch>.' \
+    '' \
+    'Options:' \
+    '  -b, --base <branch>    Base branch name. Defaults to the remote HEAD branch.' \
+    '  -p, --path <path>      Destination path. Defaults to ../<repo>-<branch>.' \
+    '  -r, --remote <name>    Remote name. Defaults to origin.' \
+    '  -h, --help             Show this help.' \
+    '' \
+    'Examples:' \
+    '  wt add feature/editor-toolbar' \
+    '  wt add feature/editor-toolbar --base main' \
+    '  wt add feature/editor-toolbar --path ../sandbox/editor-toolbar'
+}
+
+usage_remove() {
+  printf '%s\n' \
+    'Usage: wt remove [options] <branch>' \
+    '       wt remove [options] --path <path>' \
+    '' \
+    'Remove a git worktree and unregister its metadata.' \
+    '' \
+    'Defaults:' \
+    '  When given a branch, the worktree path is resolved from Git metadata.' \
+    '' \
+    'Options:' \
+    '  -p, --path <path>       Remove this worktree path directly.' \
+    '  -d, --delete-branch     Delete the branch after removing the worktree.' \
+    '  -f, --force             Force worktree removal. With --delete-branch, uses git branch -D.' \
+    '  -h, --help              Show this help.' \
+    '' \
+    'Examples:' \
+    '  wt remove feature/editor-toolbar' \
+    '  wt remove feature/editor-toolbar --delete-branch' \
+    '  wt remove --path ../sandbox/editor-toolbar --force'
+}
+
+usage_list() {
+  printf '%s\n' \
+    'Usage: wt list' \
+    '' \
+    'List registered worktrees for the current repository.' \
+    '' \
+    'Alias:' \
+    '  wt ls'
+}
+
+usage_prune() {
+  printf '%s\n' \
+    'Usage: wt prune' \
+    '' \
+    'Remove stale worktree metadata left behind after manual folder deletion.'
+}
+
+repo_root() {
+  git rev-parse --show-toplevel 2>/dev/null || die 'not inside a git repository'
+}
+
+default_base() {
+  local remote="$1"
+  local remote_head
+
+  remote_head="$(git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null)" || {
+    die "could not determine $remote default branch; pass --base"
+  }
+
+  printf '%s\n' "${remote_head#"$remote/"}"
+}
+
+default_path() {
+  local branch="$1"
+  local root repo
+
+  root="$(repo_root)"
+  repo="$(basename "$root")"
+  printf '%s/%s-%s\n' "$(dirname "$root")" "$repo" "${branch//\//-}"
+}
+
+symlink_root_env_files() {
+  local root="$1"
+  local path="$2"
+  local files=()
+  local file=''
+  local name=''
+  local nullglob_was_set=0
+
+  if shopt -q nullglob; then
+    nullglob_was_set=1
+  fi
+
+  shopt -s nullglob
+  files=("$root"/.env "$root"/.env.*)
+  if (( ! nullglob_was_set )); then
+    shopt -u nullglob
+  fi
+
+  for file in "${files[@]}"; do
+    [[ -f "$file" || -L "$file" ]] || continue
+    name="$(basename "$file")"
+    [[ -e "$path/$name" || -L "$path/$name" ]] && continue
+    ln -s "$file" "$path/$name"
+  done
+}
+
+worktree_path_for_branch() {
+  local branch="$1"
+  local path=''
+  local line=''
+
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        path="${line#worktree }"
+        ;;
+      branch\ refs/heads/*)
+        if [[ "${line#branch refs/heads/}" == "$branch" ]]; then
+          printf '%s\n' "$path"
+          return 0
+        fi
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  return 1
+}
+
+branch_for_path() {
+  git -C "$1" symbolic-ref --quiet --short HEAD 2>/dev/null || true
+}
+
+cmd_add() {
+  local branch=''
+  local base=''
+  local path=''
+  local remote='origin'
+  local root=''
+
+  while (($# > 0)); do
+    case "$1" in
+      -b|--base)
+        [[ $# -ge 2 ]] || die "missing value for $1"
+        base="$2"
+        shift 2
+        ;;
+      -p|--path)
+        [[ $# -ge 2 ]] || die "missing value for $1"
+        path="$2"
+        shift 2
+        ;;
+      -r|--remote)
+        [[ $# -ge 2 ]] || die "missing value for $1"
+        remote="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage_add
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        die "unknown option $1"
+        ;;
+      *)
+        [[ -z "$branch" ]] || die 'only one branch name is allowed'
+        branch="$1"
+        shift
+        ;;
+    esac
+  done
+
+  [[ -n "$branch" ]] || {
+    usage_add >&2
+    exit 1
+  }
+
+  [[ $# -eq 0 ]] || die "unexpected arguments: $*"
+
+  root="$(repo_root)"
+
+  if [[ -z "$base" ]]; then
+    base="$(default_base "$remote")"
+  fi
+
+  if [[ -z "$path" ]]; then
+    path="$(default_path "$branch")"
+  fi
+
+  git fetch "$remote" "$base"
+  git worktree add "$path" -b "$branch" "$remote/$base"
+  symlink_root_env_files "$root" "$path"
+  printf '%s\n' "$path"
+}
+
+cmd_remove() {
+  local branch=''
+  local delete_branch=0
+  local force=0
+  local path=''
+
+  while (($# > 0)); do
+    case "$1" in
+      -p|--path)
+        [[ $# -ge 2 ]] || die "missing value for $1"
+        path="$2"
+        shift 2
+        ;;
+      -d|--delete-branch)
+        delete_branch=1
+        shift
+        ;;
+      -f|--force)
+        force=1
+        shift
+        ;;
+      -h|--help)
+        usage_remove
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        die "unknown option $1"
+        ;;
+      *)
+        [[ -z "$branch" ]] || die 'only one branch name is allowed'
+        branch="$1"
+        shift
+        ;;
+    esac
+  done
+
+  [[ $# -eq 0 ]] || die "unexpected arguments: $*"
+
+  local root
+  root="$(repo_root)"
+
+  if [[ -z "$path" ]]; then
+    [[ -n "$branch" ]] || {
+      usage_remove >&2
+      exit 1
+    }
+
+    path="$(worktree_path_for_branch "$branch")" || die "no worktree found for branch $branch"
+  fi
+
+  [[ "$path" != "$root" ]] || die 'refusing to remove the main worktree'
+
+  if ((delete_branch)) && [[ -z "$branch" ]]; then
+    branch="$(branch_for_path "$path")"
+    [[ -n "$branch" ]] || die "could not determine branch for $path"
+  fi
+
+  if ((force)); then
+    git worktree remove --force "$path"
+  else
+    git worktree remove "$path"
+  fi
+
+  if ((delete_branch)); then
+    if ((force)); then
+      git branch -D "$branch"
+    else
+      git branch -d "$branch"
+    fi
+  fi
+}
+
+cmd_list() {
+  case "${1:-}" in
+    -h|--help)
+      usage_list
+      exit 0
+      ;;
+  esac
+
+  [[ $# -eq 0 ]] || die "unexpected arguments: $*"
+  repo_root >/dev/null
+  git worktree list
+}
+
+cmd_prune() {
+  case "${1:-}" in
+    -h|--help)
+      usage_prune
+      exit 0
+      ;;
+  esac
+
+  [[ $# -eq 0 ]] || die "unexpected arguments: $*"
+  repo_root >/dev/null
+  git worktree prune
+}
+
+main() {
+  local command="${1:-help}"
+
+  case "$command" in
+    add)
+      shift
+      cmd_add "$@"
+      ;;
+    remove|rm)
+      shift
+      cmd_remove "$@"
+      ;;
+    list|ls)
+      shift
+      cmd_list "$@"
+      ;;
+    prune)
+      shift
+      cmd_prune "$@"
+      ;;
+    help|-h|--help)
+      case "${2:-}" in
+        ''|help)
+          usage
+          ;;
+        add)
+          usage_add
+          ;;
+        remove|rm)
+          usage_remove
+          ;;
+        list|ls)
+          usage_list
+          ;;
+        prune)
+          usage_prune
+          ;;
+        *)
+          usage >&2
+          die "unknown command ${2}"
+          ;;
+      esac
+      ;;
+    *)
+      usage >&2
+      die "unknown command $command"
+      ;;
+  esac
+}
+
+main "$@"
