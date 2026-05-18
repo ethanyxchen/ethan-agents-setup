@@ -1,6 +1,5 @@
 # The Fundamental Principles
 
-- Always address me using my name 'ethan'
 - When summarising the changes you made, give me a concise and descriptive summary. Skip including file paths and line numbers. I just want to know what was wrong (if you are fixing a bug) and what you implemented.
 - Never do backwards compatibility; we move only forward
 - Do not write any comments, code is truth
@@ -14,12 +13,11 @@
 
 # Misc
 
-- Automatically commit your changes and your changes only. Do not use `git add .`
-- When Git commiting, only add the files related to the change, skip everything else. 
+- Automatically commit your changes and your changes only. Do not use `git add .` or equivalent.
+- When commiting, only add the files related to the change, skip everything else. 
 - Before commiting, make sure to run lint, check if there is one. Run tests if they're lightweight.
 - We want the simplest change possible. We don't care about migration. Code readability matters most, and we're happy to make bigger changes to achieve it.
 - When the user asks for a plan, dive deep into the code first before asking clarifying questions.
-- When writing complex features or significant refactors or user ask explicitly, use the $execplan skill from design to implementation. Ask users clarifying questions before finalizing the plan using request_user_input tool. 
 - Add regression test when it fits
 - Never disable lint rules without my permissions
 - When you want to access a website, always prepend https://markdown.new/{the original url} to get a friendlier version of it
