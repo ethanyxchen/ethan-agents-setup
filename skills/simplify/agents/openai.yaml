@@ -1,0 +1,4 @@
+interface:
+  display_name: "Simplify"
+  short_description: "Simplify recent code without behavior changes"
+  default_prompt: "Use $simplify to simplify the code changed in this session without changing behavior."
