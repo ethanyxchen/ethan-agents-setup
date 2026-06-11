@@ -1,41 +1,38 @@
 ---
 name: rocket
-description: Orchestrates the Rocket Tortoise change workflow (Grill → Issue → TDD → Implement → Self-Validate → Qualitron Coverage → Review → PR). Use when starting any non-trivial change, adding a feature, fixing a bug beyond a few lines, or when the user invokes /rocket. Also use when the user mentions "the way we work", "onboarding workflow", or asks how to ship a change in this repo.
+description: "Guides a disciplined agentic coding workflow: clarify the goal, inspect the codebase, plan, test first when behavior changes, implement, validate, review, and commit or prepare a PR. Use for non-trivial coding tasks, feature work, bug fixes beyond a few lines, refactors, or when the user invokes /rocket or asks for the coding workflow."
 ---
 
-# The way we work
+# Agentic Coding Workflow
 
-Operating agreement for changes in this repo. The authoritative source is [ONBOARDING.md](../../../ONBOARDING.md); this skill drives the sequence.
+Use this workflow to make code changes with scoped intent, local evidence, and a clean handoff.
 
 ## Sequence
 
-Run these in order. At each step, name the opt-out in the eventual PR description if you skip — silent skips are the failure mode.
+Run these steps in order, scaling the depth to the risk and size of the change.
 
-0. **Ticket** — every change starts from a Linear ticket. If none is linked, ask the user whether to create one, and draft it from what they provided — do not expand the scope yet.
-1. **Grill** — invoke `/grill-with-docs`. Reach a shared design concept before writing code. Skip only for genuinely trivial work that needs no design decision from a human; record `Skipped grill: <reason>` in the PR.
-2. **Plan** — invoke `/to-issues`. Add fine-grained detail to the ticket, including the self-validation method for each implementation slice. Break mixed-concern issues into sub-issues or separate issues first.
-3. **TDD** — invoke `/tdd` for any change that adds or modifies **logic** (see Appendix A in ONBOARDING.md). UI, wiring, and config may carve out — name the carve-out in the PR.
-4. **Implement** — interface first, body delegated. Stay in the ubiquitous language of the module's `CONTEXT.md`. Update `CONTEXT.md` in the same diff when the interface or domain language shifts; `/grill-with-docs` writes those updates as the grill resolves.
-5. **Self-Validation** — after implementation, derive a checklist from the Grill decisions, issue acceptance criteria, TDD tests, changed package scripts, and touched behavior. Run the strongest feasible local checks: targeted tests first, then typecheck/lint/package verification, contract/schema/codegen validation, or UI smoke/manual evidence. If a check fails, fix and rerun it. Record commands and results in the PR `Tests` section; if no useful local check exists, record `Self-validation opt-out: <reason>`, and if a check is blocked by local prerequisites, record `Self-validation blocked: <reason>`.
-6. **Qualitron Coverage** — invoke `/qualitron-coverage` for non-trivial changes. Update runnable Qualitron cases, contract-backed coverage, or the coverage ledger where product behavior changed. When Qualitron harness or fixtures are required to cover the implementation, improve them where practical before marking coverage blocked; otherwise record `Qualitron Coverage opt-out: <reason>` in the PR.
-7. **Review** — invoke `/review`. The author reads every line. AI review is supplementary signal, never a substitute.
-8. **PR** — invoke `/create-pr` (plain `gh`), or the `graphite` skill (`gt`) for stacked PRs. Run `mise run verify:quick` before opening, and `mise run verify` on modified packages before requesting human review.
+1. **Clarify** - identify the user's goal, constraints, expected behavior, and definition of done. Prefer quick discovery reads over asking questions. Ask only when a missing answer would make the work risky or ambiguous.
+2. **Map** - inspect the current git state, relevant files, tests, package scripts, entry points, and neighboring patterns. Preserve unrelated user changes.
+3. **Plan** - for non-trivial work, state a concise implementation and validation plan. Split mixed concerns before editing when the work would otherwise become hard to review.
+4. **Test first** - when logic or behavior changes, add or update the smallest useful regression test before implementation. For UI, config, docs, or wiring changes, choose the strongest relevant validation instead.
+5. **Implement** - make the smallest coherent change that fits the existing architecture. Prefer existing abstractions, one source of truth, derived data over stored duplicates, and narrow public surfaces.
+6. **Validate** - run targeted tests first, then lint, typecheck, build, smoke checks, or other repository checks as appropriate. Fix failures and rerun the failed check. If validation is impossible, record the exact blocker.
+7. **Review** - read the full diff as the author. Check correctness, simplicity, error handling, security, performance, user-owned changes, and test coverage.
+8. **Handoff** - summarize what changed and what passed. When commits or PRs are expected, stage only task-related files and use a clear message.
 
-Note: **When PR approaching the 400-LOC cap, stop and ask** — split, stack, or opt-out. Do not compress code, drop comments, or collapse names to fit.
+## Operating Rules
 
-## Opt-outs are visible, not approval-gated
+- Read before editing.
+- Keep changes atomic and reviewable.
+- Do not overwrite changes you did not make.
+- Do not invent compatibility layers unless the user explicitly asks or an external contract requires them.
+- Prefer removing complexity over adding structure; add an abstraction only when it reduces real duplication or meaningful complexity.
+- Make skipped validation explicit with `No useful local check: <reason>` or `Validation blocked: <reason>`.
+- End with the concrete result, the checks run, and any residual risk.
 
-Treat every change as non-trivial by default. When a rule doesn't fit, write one line in the PR description:
+## Commit Discipline
 
-- `Skipped grill: 3-line bug fix in known module`
-- `No tests: pure UI tweak, manually verified on macOS`
-- `Self-validation opt-out: docs-only wording change`
-- `Self-validation blocked: local credentials unavailable for provider smoke test`
-- `Qualitron Coverage opt-out: internal refactor with no product behavior change`
-- `Over size cap: atomic rename across 12 files, splitting harms reviewability`
-
-The author owns the reasoning. Auditable in retro.
-
-## If you change these rules
-
-Open a PR against `ONBOARDING.md` with the case in the description. No separate governance.
+- Commit only when the user, repo instructions, or workflow requires it.
+- Stage explicit files, never broad unrelated changes.
+- Keep one logical change per commit.
+- Use the commit body only when it adds useful intent or validation context.
