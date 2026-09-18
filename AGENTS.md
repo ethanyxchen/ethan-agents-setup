@@ -13,6 +13,7 @@
 
 # Misc
 
+- Use `ethanc/` as the prefix for new Git branches unless I explicitly request a different name.
 - Automatically commit your changes and your changes only. Do not use `git add .` or equivalent.
 - When commiting, only add the files related to the change, skip everything else. 
 - Before commiting, make sure to run lint, check if there is one. Run tests if they're lightweight.
