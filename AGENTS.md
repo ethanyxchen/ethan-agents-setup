@@ -14,6 +14,7 @@
 # Misc
 
 - Use `ethanc/` as the prefix for new Git branches unless I explicitly request a different name.
+- Always create a new Git worktree with a dedicated branch before starting work on a new ticket. Keep that ticket's changes in its worktree and reuse it when continuing the same ticket.
 - Automatically commit your changes and your changes only. Do not use `git add .` or equivalent.
 - When commiting, only add the files related to the change, skip everything else. 
 - Before commiting, make sure to run lint, check if there is one. Run tests if they're lightweight.
