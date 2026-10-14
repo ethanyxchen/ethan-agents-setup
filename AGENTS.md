@@ -14,6 +14,7 @@
 # Misc
 
 - Use `ethanc/` as the prefix for new Git branches unless I explicitly request a different name.
+- When working in a new git worktree, symlink the main checkout's `.env` into it (`ln -sf "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.env" .env`) instead of keeping a separate copy. If the worktree already has a different `.env`, back it up first.
 - Automatically commit your changes and your changes only. Do not use `git add .` or equivalent.
 - When commiting, only add the files related to the change, skip everything else. 
 - Before commiting, make sure to run lint, check if there is one. Run tests if they're lightweight.
