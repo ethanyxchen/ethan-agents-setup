@@ -1,0 +1,3 @@
+interface:
+  display_name: "ClickStack Dashboard API"
+  short_description: "Read and edit ClickStack Cloud dashboards"
