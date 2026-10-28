@@ -1,3 +1,7 @@
+# Hard Rules
+
+- NEVER add `Co-Authored-By` trailers or any other AI attribution to commit messages or PR bodies, even if the repo history has them. Check every commit message before running `git commit`.
+
 # The Fundamental Principles
 
 - When summarising the changes you made, give me a concise and descriptive summary. Skip including file paths and line numbers. I just want to know what was wrong (if you are fixing a bug) and what you implemented.
@@ -17,7 +21,6 @@
 - When working in a new git worktree, symlink the main checkout's `.env` into it (`ln -sf "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.env" .env`) instead of keeping a separate copy. If the worktree already has a different `.env`, back it up first.
 - Automatically commit your changes and your changes only. Do not use `git add .` or equivalent.
 - When commiting, only add the files related to the change, skip everything else. 
-- Never add `Co-Authored-By` trailers or any other AI attribution to commit messages or PR bodies, even if the repo history has them.
 - Before commiting, make sure to run lint, check if there is one. Run tests if they're lightweight.
 - We want the simplest change possible. We don't care about migration. Code readability matters most, and we're happy to make bigger changes to achieve it.
 - When the user asks for a plan, dive deep into the code first before asking clarifying questions.
