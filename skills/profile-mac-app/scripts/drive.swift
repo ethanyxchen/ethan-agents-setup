@@ -24,22 +24,33 @@ func texts(_ element: AXUIElement) -> [String] {
   ["AXTitle", "AXDescription", "AXValue"].compactMap { attribute(element, $0) as? String }
 }
 
-func first(in element: AXUIElement, where matches: (AXUIElement) -> Bool) -> AXUIElement? {
+func first(in element: AXUIElement, visited: inout Set<AXUIElement>, where matches: (AXUIElement) -> Bool) -> AXUIElement? {
+  guard visited.insert(element).inserted else { return nil }
   if matches(element) { return element }
   for child in children(element) {
-    if let found = first(in: child, where: matches) { return found }
+    if let found = first(in: child, visited: &visited, where: matches) { return found }
   }
   return nil
+}
+
+func first(in element: AXUIElement, where matches: (AXUIElement) -> Bool) -> AXUIElement? {
+  var visited = Set<AXUIElement>()
+  return first(in: element, visited: &visited, where: matches)
 }
 
 func labelled(_ element: AXUIElement, _ label: String) -> Bool {
   first(in: element) { texts($0).contains(label) } != nil
 }
 
-func dump(_ element: AXUIElement, depth: Int) {
+func dump(_ element: AXUIElement, depth: Int, visited: inout Set<AXUIElement>) {
   let role = attribute(element, "AXRole") as? String ?? "?"
-  print(String(repeating: "  ", count: depth) + role + " " + texts(element).map { "\"\($0.prefix(60))\"" }.joined(separator: " "))
-  for child in children(element) { dump(child, depth: depth + 1) }
+  let line = String(repeating: "  ", count: depth) + role + " " + texts(element).map { "\"\($0.prefix(60))\"" }.joined(separator: " ")
+  guard visited.insert(element).inserted else {
+    print(line + "  <- already listed above (cycle in the accessibility tree)")
+    return
+  }
+  print(line)
+  for child in children(element) { dump(child, depth: depth + 1, visited: &visited) }
 }
 
 func milliseconds() -> Double { Double(clock_gettime_nsec_np(CLOCK_UPTIME_RAW)) / 1e6 }
@@ -75,7 +86,11 @@ case "open":
   reopen(pid, app)
   exit(((attribute(app, "AXWindows") as? [AXUIElement]) ?? []).isEmpty ? 1 : 0)
 case "tree":
-  for window in (attribute(app, "AXWindows") as? [AXUIElement]) ?? [] { dump(window, depth: 0) }
+  for window in (attribute(app, "AXWindows") as? [AXUIElement]) ?? [] {
+    print(window == attribute(app, "AXMainWindow").map({ $0 as! AXUIElement }) ? "main window:" : "other window:")
+    var visited = Set<AXUIElement>()
+    dump(window, depth: 1, visited: &visited)
+  }
   exit(0)
 case "run":
   break
@@ -86,7 +101,7 @@ default:
 let plan = try JSONDecoder().decode(Plan.self, from: Data(contentsOf: URL(fileURLWithPath: arguments[3])))
 let rounds = Int(arguments[4])!
 let gap = Double(arguments[5])!
-guard let window = (attribute(app, "AXWindows") as? [AXUIElement])?.first else {
+guard let window = attribute(app, "AXMainWindow").map({ $0 as! AXUIElement }) ?? (attribute(app, "AXWindows") as? [AXUIElement])?.first else {
   FileHandle.standardError.write("The app has no open window. Run `drive open <pid>` first.\n".data(using: .utf8)!)
   exit(1)
 }
